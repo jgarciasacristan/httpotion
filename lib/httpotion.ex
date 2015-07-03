@@ -62,10 +62,12 @@ defmodule HTTPotion.Base do
 
         if user_password = Dict.get(options, :digest_auth) do
           {user, password} = user_password
-          response = HTTPotion.get(url)          
-          digest_token =  HTTPotion.DigestAuth.get_digest_token(response, url, user, password)
+          response = HTTPotion.request(method, url, Dict.drop(options, [:digest_auth]))
+          if authenticate_header = Dict.get(response.headers,:"WWW-Authenticate") do
+            digest_token =  HTTPotion.DigestAuth.get_digest_token(authenticate_header, url, user, password)
 
-          headers =  Dict.put(headers, :"Authorization", "Digest #{digest_token}")
+            headers =  Dict.put(headers, :"Authorization", "Digest #{digest_token}")
+          end
         end
 
         %{
@@ -178,8 +180,8 @@ defmodule HTTPotion.Base do
 end
 
 defmodule HTTPotion.DigestAuth do
-  def get_digest_token(response, url, username, password) do
-      digest_head = parse_digest_header(response.headers |> Dict.get(:"WWW-Authenticate"))
+  def get_digest_token(authenticate_header, url, username, password) do
+      digest_head = parse_digest_header(authenticate_header)
       %{"realm" => realm, "nonce"  => nonce} = digest_head
       cnonce = :crypto.strong_rand_bytes(16) |> md5
       url = URI.parse(url)
